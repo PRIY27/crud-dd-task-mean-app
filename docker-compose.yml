@@ -1,0 +1,65 @@
+version: '3.8'
+
+services:
+  # MongoDB Database Service
+  mongodb:
+    image: mongo:6.0
+    container_name: mean-mongodb
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: password
+      MONGO_INITDB_DATABASE: dd_db
+    volumes:
+      - mongodb_data:/data/db
+      - mongodb_config:/data/configdb
+    networks:
+      - mean-network
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Node.js Backend Service
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: mean-backend
+    ports:
+      - "8080:8080"
+    environment:
+      NODE_ENV: production
+      MONGODB_URI: mongodb://admin:password@mongodb:27017/dd_db?authSource=admin
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - mean-network
+    restart: unless-stopped
+
+  # Angular Frontend Service
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: mean-frontend
+    ports:
+      - "8081:8081"
+    environment:
+      NODE_ENV: production
+    depends_on:
+      - backend
+    networks:
+      - mean-network
+    restart: unless-stopped
+
+volumes:
+  mongodb_data:
+  mongodb_config:
+
+networks:
+  mean-network:
+    driver: bridge
